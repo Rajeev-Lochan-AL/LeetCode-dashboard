@@ -195,3 +195,18 @@ a.profile-link:hover {
 .error-text {
     color: var(--accent-hard);
 }
+.download-btn {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 10px 20px;
+    background-color: #00b8a3;
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 600;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+}
+
+.download-btn:hover {
+    background-color: #009684;
+}
