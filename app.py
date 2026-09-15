@@ -109,6 +109,35 @@ def api_stats():
         'active_students_list': active_df.to_dict(orient='records'),
         'not_attended_list': not_attended_df.to_dict(orient='records')
     })
+@app.route('/api/update-profile', methods=['POST'])
+def update_profile():
+    data = requests.get_json()
+    reg_number = str(data.get('reg_number', '')).strip()
+    profile_url = str(data.get('profile_url', '')).strip()
+
+    if not reg_number or not profile_url:
+        return jsonify({'success': False, 'message': 'Register Number and LeetCode Link are required.'}), 400
+
+    username = extract_username(profile_url)
+    if not username:
+        return jsonify({'success': False, 'message': 'Invalid LeetCode URL format.'}), 400
+
+    try:
+        df = pd.read_excel(DATA_FILE)
+        df['REGISTER NUMBER'] = df['REGISTER NUMBER'].astype(str).str.replace(r'\.0$', '', regex=True)
+
+        # Match student by Register Number
+        mask = df['REGISTER NUMBER'] == reg_number
+        if not mask.any():
+            return jsonify({'success': False, 'message': 'Register Number not found in record.'}), 404
+
+        # Update Leetcode Link
+        df.loc[mask, 'Leetcode Link'] = profile_url
+        df.to_excel(DATA_FILE, index=False)
+
+        return jsonify({'success': True, 'message': 'LeetCode profile updated successfully!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'}), 500
 
 @app.route('/download')
 def download_excel():

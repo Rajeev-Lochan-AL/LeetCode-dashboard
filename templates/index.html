@@ -7,13 +7,14 @@
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='icon.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <a href="/download" class="download-btn">Download Excel Report</a>
 </head>
 <body>
 
     <div class="header">
         <h1>LeetCode Analytics Dashboard</h1>
         <p>Real-time performance tracking & class analytics</p>
+        <a href="/download" class="download-btn">Download Excel Report</a>
+        <button onclick="openModal()" class="update-btn">➕ Add / Update Profile</button>
     </div>
 
     <div class="stats-grid">
@@ -96,6 +97,26 @@
         </div>
     </details>
 
+    <!-- Add Profile Modal -->
+    <div id="profileModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2>Submit LeetCode Profile</h2>
+            <p>Enter your details to link your profile to the dashboard.</p>
+            
+            <form id="profileForm" onsubmit="handleProfileSubmit(event)">
+                <label for="regNumber">Register Number</label>
+                <input type="text" id="regNumber" placeholder="e.g., 2024MCA001" required>
+                
+                <label for="profileUrl">LeetCode Profile URL</label>
+                <input type="url" id="profileUrl" placeholder="https://leetcode.com/u/your_username/" required>
+                
+                <button type="submit" id="submitBtn">Update Profile</button>
+                <p id="modalStatus" class="status-msg"></p>
+            </form>
+        </div>
+    </div>
+    
     <script>
         let activeStudentsData = [];
         let notAttendedData = [];
@@ -237,6 +258,54 @@
 
             renderActiveTable(filteredActive);
             renderNotAttendedTable(filteredNotAttended);
+        }
+
+        function openModal() {
+            document.getElementById('profileModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('profileModal').style.display = 'none';
+            document.getElementById('modalStatus').innerText = '';
+        }
+
+        async function handleProfileSubmit(event) {
+            event.preventDefault();
+            const submitBtn = document.getElementById('submitBtn');
+            const statusMsg = document.getElementById('modalStatus');
+            
+            const reg_number = document.getElementById('regNumber').value.trim();
+            const profile_url = document.getElementById('profileUrl').value.trim();
+
+            submitBtn.disabled = true;
+            statusMsg.innerText = 'Updating profile...';
+            statusMsg.style.color = '#38bdf8';
+
+            try {
+                const response = await fetch('/api/update-profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reg_number, profile_url })
+                });
+
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    statusMsg.style.color = '#4ade80';
+                    statusMsg.innerText = result.message;
+                    setTimeout(() => {
+                        closeModal();
+                        fetchDashboardData();
+                    }, 1500);
+                } else {
+                    statusMsg.style.color = '#f87171';
+                    statusMsg.innerText = result.message;
+                }
+            } catch (err) {
+                statusMsg.style.color = '#f87171';
+                statusMsg.innerText = 'Failed to update. Try again.';
+            } finally {
+                submitBtn.disabled = false;
+            }
         }
 
         document.addEventListener('DOMContentLoaded', fetchDashboardData);

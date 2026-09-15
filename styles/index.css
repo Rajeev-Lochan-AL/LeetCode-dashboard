@@ -35,6 +35,42 @@ body {
     margin-top: 5px;
 }
 
+/* Header Action Buttons */
+.download-btn {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 10px 20px;
+    background-color: var(--accent-easy);
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 600;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+}
+
+.download-btn:hover {
+    background-color: #009684;
+}
+
+.update-btn {
+    display: inline-block;
+    margin-top: 12px;
+    margin-left: 8px;
+    padding: 10px 20px;
+    background-color: var(--primary);
+    color: #ffffff;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: background-color 0.2s ease;
+}
+
+.update-btn:hover {
+    background-color: #2563eb;
+}
+
 /* KPI Cards Grid */
 .stats-grid {
     display: grid;
@@ -195,18 +231,107 @@ a.profile-link:hover {
 .error-text {
     color: var(--accent-hard);
 }
-.download-btn {
-    display: inline-block;
-    margin-top: 12px;
-    padding: 10px 20px;
-    background-color: #00b8a3;
-    color: #ffffff;
-    text-decoration: none;
+
+/* Modal Overlay & Card Styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(4px);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--card-bg);
+    padding: 28px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 420px;
+    color: var(--text-color);
+    position: relative;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+.modal-content h2 {
+    margin-top: 0;
+    font-size: 1.3rem;
+}
+
+.modal-content p {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+}
+
+.modal-content label {
+    display: block;
+    font-size: 0.85rem;
     font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.modal-content input {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 16px;
     border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
+    color: var(--text-color);
+    box-sizing: border-box;
+    outline: none;
+}
+
+.modal-content input:focus {
+    border-color: var(--primary);
+}
+
+.modal-content button[type="submit"] {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent-easy);
+    border: none;
+    color: white;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
     transition: background-color 0.2s ease;
 }
 
-.download-btn:hover {
-    background-color: #009684;
+.modal-content button[type="submit"]:hover {
+    background: #009684;
+}
+
+.modal-content button[type="submit"]:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.close-btn {
+    position: absolute;
+    right: 18px;
+    top: 16px;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: color 0.2s ease;
+}
+
+.close-btn:hover {
+    color: var(--text-color);
+}
+
+.status-msg {
+    margin-top: 14px;
+    font-size: 0.85rem;
+    text-align: center;
 }
