@@ -112,13 +112,26 @@ def api_stats():
 
 @app.route('/download')
 def download_excel():
-    """Fetches live data and triggers an .xlsx download."""
+    """Fetches live data and triggers an .xlsx download with clean text formatting for reg numbers."""
     df = get_live_processed_data()
     
-    # Create an in-memory buffer to stream the file download
+    # Ensure Register Number is clean string without decimals or scientific notation
+    if 'REGISTER NUMBER' in df.columns:
+        df['REGISTER NUMBER'] = df['REGISTER NUMBER'].astype(str).str.replace(r'\.0$', '', regex=True)
+    
     output = io.BytesIO()
+    
+    # Use Openpyxl engine to write and format
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='LeetCode Status')
+        
+        # Access openpyxl worksheet to set explicit text cell formatting
+        worksheet = writer.sheets['LeetCode Status']
+        reg_col_idx = df.columns.get_loc('REGISTER NUMBER') + 1  # 1-based index
+        
+        for row in range(2, len(df) + 2):  # Skip header row
+            cell = worksheet.cell(row=row, column=reg_col_idx)
+            cell.number_format = '@'  # Force Excel Text Format
     
     output.seek(0)
     
@@ -126,7 +139,7 @@ def download_excel():
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True,
-        download_name='Updated_LeetCode_Status.xlsx'
+        download_name='LeetCode_Status_Tracker.xlsx'
     )
 
 if __name__ == '__main__':
