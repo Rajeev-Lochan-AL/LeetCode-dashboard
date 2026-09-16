@@ -1,19 +1,39 @@
 import io
 import re
-from flask import Flask, render_template, jsonify, send_file
+import json
+import os
+from flask import Flask, render_template, jsonify, send_file, request, send_from_directory
 import pandas as pd
 import requests
 
 app = Flask(__name__, static_folder='styles', static_url_path='/styles')
 
 DATA_FILE = 'Leetcode Status.xlsx'
+RANK_HISTORY_FILE = 'rank_history.json'
+
+def load_previous_ranks():
+    """Loads previously saved student ranks from local JSON file."""
+    if os.path.exists(RANK_HISTORY_FILE):
+        try:
+            with open(RANK_HISTORY_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_current_ranks(ranks_dict):
+    """Saves updated student ranks to local JSON file."""
+    try:
+        with open(RANK_HISTORY_FILE, 'w') as f:
+            json.dump(ranks_dict, f)
+    except Exception as e:
+        print(f"Error saving rank history: {e}")
 
 def extract_username(profile_url):
     """Extracts username from LeetCode URL (e.g., https://leetcode.com/u/username/ -> username)."""
     if not isinstance(profile_url, str) or not profile_url.strip() or profile_url == '#':
         return None
     
-    # Matches patterns like /u/username/ or /username/
     match = re.search(r'leetcode\.com/(?:u/)?([^/]+)', profile_url)
     return match.group(1) if match else None
 
@@ -45,8 +65,6 @@ def fetch_leetcode_stats(username):
             user_data = data.get('data', {}).get('matchedUser')
             if user_data:
                 stats = user_data['submitStats']['acSubmissionNum']
-                
-                # Parse difficulty counts
                 counts = {item['difficulty']: item['count'] for item in stats}
                 return {
                     'Easy': counts.get('Easy', 0),
@@ -86,6 +104,11 @@ def get_live_processed_data():
 def index():
     return render_template('index.html')
 
+@app.route('/scripts/<path:filename>')
+def send_script(filename):
+    """Serves javascript files located in the root /scripts folder."""
+    return send_from_directory('scripts', filename)
+
 @app.route('/api/stats')
 def api_stats():
     df = get_live_processed_data()
@@ -94,7 +117,33 @@ def api_stats():
     active_students = int((df['Total Completed'] > 0).sum())
     not_attended_count = total_students - active_students
     
-    sorted_df = df.sort_values(by=['Total Completed', 'Hard', 'Med.', 'Easy'], ascending=False)
+    # Sort students globally by total completed & tiebreakers
+    sorted_df = df.sort_values(by=['Total Completed', 'Hard', 'Med.', 'Easy'], ascending=False).reset_index(drop=True)
+    
+    # Assign current overall rank
+    sorted_df['rank'] = sorted_df.index + 1
+    
+    # Calculate rank movement compared to last stored session
+    previous_ranks = load_previous_ranks()
+    current_ranks_dict = {}
+    rank_changes = []
+    
+    for idx, row in sorted_df.iterrows():
+        reg_num = str(row['REGISTER NUMBER'])
+        curr_rank = int(row['rank'])
+        current_ranks_dict[reg_num] = curr_rank
+        
+        if reg_num in previous_ranks:
+            prev_rank = previous_ranks[reg_num]
+            # Change calculation: if prev rank was 13 and curr rank is 9 -> (13 - 9) = +4 (moved UP)
+            change = prev_rank - curr_rank 
+        else:
+            change = 0
+            
+        rank_changes.append(change)
+        
+    sorted_df['rank_change'] = rank_changes
+    save_current_ranks(current_ranks_dict)
     
     active_df = sorted_df[sorted_df['Total Completed'] > 0].copy()
     not_attended_df = sorted_df[sorted_df['Total Completed'] == 0].copy()
@@ -109,34 +158,40 @@ def api_stats():
         'active_students_list': active_df.to_dict(orient='records'),
         'not_attended_list': not_attended_df.to_dict(orient='records')
     })
+
 @app.route('/api/update-profile', methods=['POST'])
 def update_profile():
-    data = requests.get_json()
-    reg_number = str(data.get('reg_number', '')).strip()
-    profile_url = str(data.get('profile_url', '')).strip()
-
-    if not reg_number or not profile_url:
-        return jsonify({'success': False, 'message': 'Register Number and LeetCode Link are required.'}), 400
-
-    username = extract_username(profile_url)
-    if not username:
-        return jsonify({'success': False, 'message': 'Invalid LeetCode URL format.'}), 400
-
     try:
+        data = request.get_json()
+        reg_num = str(data.get('reg_number', '')).strip()
+        profile_url = str(data.get('profile_url', '')).strip()
+
+        username = extract_username(profile_url)
+        if not username:
+            return jsonify({'success': False, 'message': 'Invalid LeetCode URL format'}), 400
+
         df = pd.read_excel(DATA_FILE)
-        df['REGISTER NUMBER'] = df['REGISTER NUMBER'].astype(str).str.replace(r'\.0$', '', regex=True)
 
-        # Match student by Register Number
-        mask = df['REGISTER NUMBER'] == reg_number
-        if not mask.any():
-            return jsonify({'success': False, 'message': 'Register Number not found in record.'}), 404
+        df['REGISTER NUMBER'] = df['REGISTER NUMBER'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
 
-        # Update Leetcode Link
-        df.loc[mask, 'Leetcode Link'] = profile_url
+        if reg_num not in df['REGISTER NUMBER'].values:
+            return jsonify({'success': False, 'message': 'Register Number not found'}), 404
+
+        df.loc[df['REGISTER NUMBER'] == reg_num, 'Leetcode Link'] = profile_url
+        
+        stats = fetch_leetcode_stats(username)
+        if stats:
+            df.loc[df['REGISTER NUMBER'] == reg_num, 'Easy'] = stats['Easy']
+            df.loc[df['REGISTER NUMBER'] == reg_num, 'Med.'] = stats['Med.']
+            df.loc[df['REGISTER NUMBER'] == reg_num, 'Hard'] = stats['Hard']
+            df.loc[df['REGISTER NUMBER'] == reg_num, 'Total Completed'] = stats['Total Completed']
+
         df.to_excel(DATA_FILE, index=False)
 
-        return jsonify({'success': True, 'message': 'LeetCode profile updated successfully!'})
+        return jsonify({'success': True, 'message': 'Profile updated successfully!'})
+
     except Exception as e:
+        print(f"Error in /api/update-profile: {e}")
         return jsonify({'success': False, 'message': f'Server error: {str(e)}'}), 500
 
 @app.route('/download')
@@ -144,23 +199,20 @@ def download_excel():
     """Fetches live data and triggers an .xlsx download with clean text formatting for reg numbers."""
     df = get_live_processed_data()
     
-    # Ensure Register Number is clean string without decimals or scientific notation
     if 'REGISTER NUMBER' in df.columns:
         df['REGISTER NUMBER'] = df['REGISTER NUMBER'].astype(str).str.replace(r'\.0$', '', regex=True)
     
     output = io.BytesIO()
     
-    # Use Openpyxl engine to write and format
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='LeetCode Status')
         
-        # Access openpyxl worksheet to set explicit text cell formatting
         worksheet = writer.sheets['LeetCode Status']
-        reg_col_idx = df.columns.get_loc('REGISTER NUMBER') + 1  # 1-based index
+        reg_col_idx = df.columns.get_loc('REGISTER NUMBER') + 1
         
-        for row in range(2, len(df) + 2):  # Skip header row
+        for row in range(2, len(df) + 2):
             cell = worksheet.cell(row=row, column=reg_col_idx)
-            cell.number_format = '@'  # Force Excel Text Format
+            cell.number_format = '@'
     
     output.seek(0)
     
